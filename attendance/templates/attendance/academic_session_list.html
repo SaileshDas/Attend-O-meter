@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Academic Sessions{% endblock %}
+
+{% block content %}
+    <h2>Your Academic Sessions</h2>
+    <p><a href="{% url 'add_academic_session' %}">Add New Academic Session</a></p>
+    {% if sessions %}
+        <ul>
+            {% for session in sessions %}
+                <li>
+                    <strong>{{ session.name }}</strong> ({{ session.start_date|date:"Y" }} - {{ session.end_date|date:"Y" }})
+                    {% if session.is_current %}
+                        - <span style="font-weight: bold; color: green;">Current</span>
+                    {% endif %}
+                    <a href="{% url 'update_academic_session' pk=session.pk %}">Edit</a>
+                    <a href="{% url 'add_subject' session_pk=session.pk %}">Add Subject</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>You haven't added any academic sessions yet. <a href="{% url 'add_academic_session' %}">Add one now</a>!</p>
+    {% endif %}
+{% endblock %}

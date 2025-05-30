@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% load static %} {# if you use static files #}
+
+{% block title %}Dashboard{% endblock %} {# This is the only instance of block title #}
+
+{% block content %} {# This is the only instance of block content #}
+<div class="container mt-4">
+    <h2 class="mb-4">Welcome to your Dashboard, {{ user.username }}!</h2>
+
+    {% if current_session %}
+        <h3>Current Academic Session: {{ current_session.name }} (<a href="{% url 'update_academic_session' pk=current_session.pk %}">Edit</a> | <a href="{% url 'academic_session_list' %}">All Sessions</a>)</h3>
+
+        <div class="row"> {# Start of row for existing content and new holiday card #}
+            {# Existing Subjects Card/Section #}
+            <div class="col-md-6 mb-3"> {# Adjust column size as needed #}
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h4>Your Subjects: <a href="{% url 'add_subject' session_pk=current_session.pk %}">Add New Subject</a></h4>
+                        {% if subjects %}
+                            <ul class="subject-list">
+                                {% for subject in subjects %}
+                                    <li>
+                                        <div>
+                                            <a href="{% url 'subject_detail' pk=subject.pk %}">{{ subject.name }} ({{ subject.code|default:"N/A" }})</a>
+                                            <br>
+                                            <small>Min. Attendance: {{ subject.minimum_attendance_percentage|floatformat:"0" }}%</small>
+                                        </div>
+                                        <div class="subject-actions">
+                                            <a href="{% url 'add_attendance' subject_pk=subject.pk %}">Add Attendance</a>
+                                            <a href="{% url 'update_subject' pk=subject.pk %}">Edit</a>
+                                        </div>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p>No subjects added yet for this session. <a href="{% url 'add_subject' session_pk=current_session.pk %}">Add your first subject</a>.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {# Existing Exams Card/Section #}
+            <div class="col-md-6 mb-3"> {# Adjust column size as needed #}
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h4>Upcoming Exams: <a href="{% url 'add_exam_date' session_pk=current_session.pk %}">Add New Exam Date</a></h4>
+                        {% if exam_dates %}
+                            <ul>
+                                {% for exam in exam_dates %}
+                                    <li>{{ exam.exam_type }}: {{ exam.start_date|date:"F d, Y" }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p>No exam dates added yet for this session. <a href="{% url 'add_exam_date' session_pk=current_session.pk %}">Add an exam date</a>.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            {# Holidays Management Card (The one I provided) #}
+            <div class="col-md-4 mb-3"> {# Place this in a new row or alongside other content #}
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">Holidays Management</h5>
+                        <p class="card-text">Add or manage holidays for academic sessions.</p>
+                        <a href="{% url 'bulk_add_holidays' %}" class="btn btn-info">Add Multiple Holidays</a>
+                        {# Optional: Link to the admin page for Holidays #}
+                        <a href="{% url 'admin:attendance_holiday_changelist' %}" class="btn btn-secondary mt-2">View/Edit Holidays in Admin</a>
+                    </div>
+                </div>
+            </div>
+
+        </div> {# End of row #}
+
+    {% else %}
+        <p>No current academic session found. Please <a href="{% url 'add_academic_session' %}">add a new academic session</a> to get started.</p>
+    {% endif %}
+</div>
+{% endblock %}

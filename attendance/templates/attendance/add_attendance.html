@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}Add Attendance for {{ subject.name }}{% endblock %}
+
+{% block content %}
+    <h2>Add Attendance for {{ subject.name }}</h2>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Add Record</button>
+    </form>
+    <p><a href="{% url 'subject_detail' pk=subject.pk %}">Back to {{ subject.name }} Details</a> | <a href="{% url 'dashboard' %}">Back to Dashboard</a></p>
+{% endblock %}

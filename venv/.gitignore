@@ -1,0 +1,25 @@
+# Byte-code files
+*.pyc
+__pycache__/
+
+# Django stuff:
+*.log
+*.pot
+*.mo
+*.sqlite3 # Your database file
+media/ # User-uploaded files (if you implement file uploads later)
+static_root/ # Collected static files (if you use collectstatic)
+.env # Environment variables
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# IDE-specific files (e.g., VS Code)
+.vscode/
+.idea/
+
+# Operating System files
+.DS_Store
+Thumbs.db
