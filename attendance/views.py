@@ -396,7 +396,7 @@ def add_attendance(request, subject_pk):
                 messages.error(request, f"An attendance record for {subject.name} on {record.date} already exists.")
     else:
         # Set the initial date to today's date when the form is first displayed (GET request)
-        form = AttendanceRecordForm(initial={'date': datetime.date.today()})
+        form = AttendanceRecordForm(initial={'date': datetime.today().date()}) # CORRECTED: Get current datetime, then extract date part
     context = {'form': form, 'subject': subject}
     return render(request, 'attendance/add_attendance.html', context)
 
