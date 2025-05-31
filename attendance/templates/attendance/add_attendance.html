@@ -3,11 +3,49 @@
 {% block title %}Add Attendance for {{ subject.name }}{% endblock %}
 
 {% block content %}
-    <h2>Add Attendance for {{ subject.name }}</h2>
-    <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit">Add Record</button>
-    </form>
-    <p><a href="{% url 'subject_detail' pk=subject.pk %}">Back to {{ subject.name }} Details</a> | <a href="{% url 'dashboard' %}">Back to Dashboard</a></p>
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Add Attendance for {{ subject.name }}</h4>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+
+                    {# Display non-field errors if any #}
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger" role="alert">
+                            {% for error in form.non_field_errors %}
+                                <p class="mb-0">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    {# Loop through each field in the form #}
+                    {% for field in form %}
+                        <div class="mb-3">
+                            {# Standard label for most input types (text, number, date, etc.) #}
+                            <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                            {{ field }} {# This renders the input with 'form-control' class #}
+                            {% if field.errors %}
+                                {% for error in field.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            {% endif %}
+                            {% if field.help_text %}
+                                <div class="form-text">{{ field.help_text }}</div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+
+                    <button type="submit" class="btn btn-primary mt-3">Add Record</button>
+                    {# Keep both back links, styled as Bootstrap buttons #}
+                    <a href="{% url 'subject_detail' pk=subject.pk %}" class="btn btn-secondary mt-3 ms-2">Back to {{ subject.name }} Details</a>
+                    <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary mt-3 ms-2">Back to Dashboard</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

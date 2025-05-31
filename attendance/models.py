@@ -1,6 +1,8 @@
 # attendance/models.py
 from django.db import models
-from django.contrib.auth.models import User # To link data to specific users
+from django.contrib.auth import get_user_model # To link data to specific users
+
+User = get_user_model()
 
 # --- AcademicSession Model ---
 class AcademicSession(models.Model):
@@ -11,7 +13,7 @@ class AcademicSession(models.Model):
     is_current = models.BooleanField(default=False, help_text="Is this the active session for the user?")
 
     def __str__(self):
-        return f"{self.user.username}'s {self.name}"
+        return f"{self.name} ({self.start_date.year}-{self.end_date.year})"
 
     class Meta:
         # Ensures a user can only have one current session at a time
@@ -78,16 +80,16 @@ class ExamDate(models.Model):
 
 # --- Holiday Model ---
 class Holiday(models.Model):
-    # Link holidays to a specific session if they are session-specific (e.g., mid-sem break)
-    # Or keep it general if holidays apply across all sessions (e.g., national holidays)
-    # For now, let's link to AcademicSession, assuming holidays are declared per session/year.
     session = models.ForeignKey(AcademicSession, on_delete=models.CASCADE, related_name='holidays')
-    date = models.DateField(unique=False) # Not unique globally, but unique per session
-    name = models.CharField(max_length=100, help_text="e.g., Diwali, Semester Break, Mid-Sem Holiday")
-
-    def __str__(self):
-        return f"{self.name} on {self.date} ({self.session.name})"
+    date = models.DateField()
+    # ADD THIS NEW FIELD:
+    name = models.CharField(max_length=200, blank=True, null=True)
 
     class Meta:
-        unique_together = ('session', 'date') # A specific date can only be a holiday once per session
-        ordering = ['date']
+        # ADD THIS UNIQUE CONSTRAINT:
+        unique_together = ('session', 'date')
+        ordering = ['date'] # Optional: Keeps holidays sorted by date
+
+    def __str__(self):
+        # Update the __str__ method to include the name
+        return f"{self.date} - {self.name or 'Holiday'} ({self.session.name})"

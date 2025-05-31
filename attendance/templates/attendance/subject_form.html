@@ -1,13 +1,14 @@
+{# attendance/templates/attendance/subject_form.html #}
 {% extends 'base.html' %}
 
-{% block title %}Bulk Add Holidays{% endblock %}
+{% block title %}Add/Update Subject{% endblock %} {# Updated title for versatility #}
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-6">
+    <div class="col-md-6"> {# Center the form and give it a reasonable width #}
         <div class="card shadow-sm">
             <div class="card-header bg-primary text-white">
-                <h4 class="mb-0">Bulk Add Holidays</h4>
+                <h4 class="mb-0">{% if subject %}Update Subject: {{ subject.name }}{% else %}Add New Subject{% endif %}</h4> {# Dynamic heading #}
             </div>
             <div class="card-body">
                 <form method="post">
@@ -25,10 +26,10 @@
                     {# Loop through each field in the form #}
                     {% for field in form %}
                         <div class="mb-3">
-                            {# Checkbox handling is included here just in case, though unlikely for HolidayBulkForm #}
+                            {# Special handling for checkbox fields to use Bootstrap's form-check layout #}
                             {% if field.field.widget.input_type == 'checkbox' %}
                                 <div class="form-check">
-                                    {{ field }}
+                                    {{ field }} {# This renders the checkbox input with 'form-check-input' class #}
                                     <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                                     {% if field.errors %}
                                         {% for error in field.errors %}
@@ -40,8 +41,9 @@
                                     {% endif %}
                                 </div>
                             {% else %}
+                                {# Standard label for most input types (text, number, date, select, textarea) #}
                                 <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-                                {{ field }}
+                                {{ field }} {# This renders the input with 'form-control' or 'form-select' class #}
                                 {% if field.errors %}
                                     {% for error in field.errors %}
                                         <div class="text-danger small">{{ error }}</div>
@@ -54,7 +56,8 @@
                         </div>
                     {% endfor %}
 
-                    <button type="submit" class="btn btn-primary mt-3">Add Holidays</button>
+                    {# Submit button and cancel link #}
+                    <button type="submit" class="btn btn-primary mt-3">{% if subject %}Update Subject{% else %}Add Subject{% endif %}</button> {# Dynamic button text #}
                     <a href="{% url 'dashboard' %}" class="btn btn-secondary mt-3 ms-2">Cancel</a>
                 </form>
             </div>

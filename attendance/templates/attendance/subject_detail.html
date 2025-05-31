@@ -3,65 +3,142 @@
 {% block title %}{{ subject.name }} Details{% endblock %}
 
 {% block content %}
-    <h2>{{ subject.name }} ({{ subject.code|default:"N/A" }})</h2>
-    <p><strong>Academic Session:</strong> {{ subject.session.name }}</p>
-    <p><strong>Classes Per Week:</strong> {{ subject.classes_per_week }}</p>
-    <p><strong>Minimum Required Attendance:</strong> {{ subject.minimum_attendance_percentage|floatformat:"0" }}%</p>
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ subject.name }} <small class="text-muted">({{ subject.code|default:"N/A" }})</small></h2>
+        <div>
+            <a href="{% url 'update_subject' pk=subject.pk %}" class="btn btn-info me-2">Edit Subject</a>
+            <a href="{% url 'add_attendance' subject_pk=subject.pk %}" class="btn btn-primary">Add Attendance Record</a>
+        </div>
+    </div>
 
-    <h3>Current Attendance</h3>
-    <p>
-        <strong>Total Classes Conducted:</strong> {{ total_conducted }}<br>
-        <strong>Classes Attended:</strong> {{ total_attended }}<br>
-        <strong>Current Attendance Percentage:</strong> <strong style="color: {% if current_percentage >= subject.minimum_attendance_percentage %}green{% else %}red{% endif %};">{{ current_percentage|floatformat:"2" }}%</strong>
-    </p>
-    <p><a href="{% url 'add_attendance' subject_pk=subject.pk %}">Add New Attendance Record</a> | <a href="{% url 'update_subject' pk=subject.pk %}">Edit Subject</a></p>
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">Subject Details</h5>
+        </div>
+        <div class="card-body">
+            <dl class="row mb-0"> {# Using Bootstrap's definition list for key-value pairs #}
+                <dt class="col-sm-4">Academic Session:</dt>
+                <dd class="col-sm-8">{{ subject.session.name }}</dd>
 
-    <h3>Eligibility Projections</h3>
-    {% if eligibility_info %}
-        {% for exam_type, info in eligibility_info.items %}
-            <div style="border: 1px solid #ccc; padding: 10px; margin-bottom: 15px; border-radius: 5px;">
-                <h4>For {{ exam_type }}:</h4>
-                <p>
-                    <strong>Projected Total Classes by Exam:</strong> {{ info.total_projected_classes }}<br>
-                    <strong>Classes Remaining to be Conducted:</strong> {{ info.classes_remaining_to_be_conducted }}<br>
-                    <strong>Required Classes to Attend:</strong> {{ info.min_required_classes }}<br>
-                </p>
-                <p>
-                    <strong>Status:</strong>
-                    <span style="font-weight: bold; color:
-                        {% if 'Good' in info.status %}green
-                        {% elif 'Needs Attention' in info.status %}orange
-                        {% elif 'Ineligible' in info.status %}red
-                        {% else %}gray
-                        {% endif %};">
-                        {{ info.status }}
+                <dt class="col-sm-4">Classes Per Week:</dt>
+                <dd class="col-sm-8">{{ subject.classes_per_week }}</dd>
+
+                <dt class="col-sm-4">Minimum Required Attendance:</dt>
+                <dd class="col-sm-8">{{ subject.minimum_attendance_percentage|floatformat:"0" }}%</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">Current Attendance</h5>
+        </div>
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-4">Total Classes Conducted:</dt>
+                <dd class="col-sm-8">{{ total_conducted }}</dd>
+
+                <dt class="col-sm-4">Classes Attended:</dt>
+                <dd class="col-sm-8">{{ total_attended }}</dd>
+
+                <dt class="col-sm-4">Current Attendance Percentage:</dt>
+                <dd class="col-sm-8">
+                    <span class="badge {% if current_percentage >= subject.minimum_attendance_percentage %}bg-success{% else %}bg-danger{% endif %} fs-6">
+                        {{ current_percentage|floatformat:"2" }}%
                     </span>
-                </p>
-                <p><strong>Detail:</strong> {{ info.detail }}</p>
-                {% if 'Exam Past' not in info.status %}
-                    <p>
-                        <strong>Classes to Attend for Eligibility:</strong> {{ info.classes_to_attend_for_eligibility }}<br>
-                        <strong>Classes You Can Miss:</strong> {{ info.classes_can_miss }}
-                    </p>
-                {% endif %}
-            </div>
-        {% endfor %}
-    {% else %}
-        <p>No exam dates set for this academic session yet. Please <a href="{% url 'add_exam_date' session_pk=subject.session.pk %}">add exam dates</a> to see eligibility projections.</p>
-    {% endif %}
+                </dd>
+            </dl>
+        </div>
+    </div>
 
-    <h3>Attendance History</h3>
-    {% if attendance_records %}
-        <ul>
-            {% for record in attendance_records %}
-                <li>{{ record.date|date:"F d, Y" }}: {{ record.classes_attended }} / {{ record.classes_conducted }} attended</li>
-            {% empty %}
-                <li>No attendance records yet for this subject.</li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p>No attendance records yet for this subject.</p>
-    {% endif %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">Eligibility Projections</h5>
+        </div>
+        <div class="card-body">
+            {% if eligibility_info %}
+                {% for exam_type, info in eligibility_info.items %}
+                    <div class="card bg-light mb-3"> {# Inner card for each exam projection #}
+                        <div class="card-body">
+                            <h6 class="card-title text-primary">{{ exam_type }} Exam Projection</h6>
+                            <dl class="row mb-0 small">
+                                <dt class="col-sm-6">Projected Total Classes by Exam:</dt>
+                                <dd class="col-sm-6">{{ info.total_projected_classes }}</dd>
 
-    <p><a href="{% url 'dashboard' %}">Back to Dashboard</a></p>
+                                <dt class="col-sm-6">Classes Remaining to be Conducted:</dt>
+                                <dd class="col-sm-6">{{ info.classes_remaining_to_be_conducted }}</dd>
+
+                                <dt class="col-sm-6">Required Classes to Attend:</dt>
+                                <dd class="col-sm-6">{{ info.min_required_classes }}</dd>
+
+                                <dt class="col-sm-6">Status:</dt>
+                                <dd class="col-sm-6">
+                                    {% if 'Good' in info.status %}
+                                        <span class="badge bg-success">{{ info.status }}</span>
+                                    {% elif 'Needs Attention' in info.status %}
+                                        <span class="badge bg-warning text-dark">{{ info.status }}</span>
+                                    {% elif 'Ineligible' in info.status %}
+                                        <span class="badge bg-danger">{{ info.status }}</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ info.status }}</span>
+                                    {% endif %} {# <-- CORRECT PLACEMENT OF ENDIF #}
+                                </dd>
+                                <dt class="col-sm-12 mt-2">Detail:</dt>
+                                <dd class="col-sm-12">{{ info.detail }}</dd>
+                                
+                                {% if 'Exam Past' not in info.status and info.total_projected_classes > 0 %} {# Only show if exam is future and classes are projected #}
+                                    <dt class="col-sm-6">Classes to Attend for Eligibility:</dt>
+                                    <dd class="col-sm-6">{{ info.classes_to_attend_for_eligibility }}</dd>
+                                    <dt class="col-sm-6">Classes You Can Miss:</dt>
+                                    <dd class="col-sm-6">{{ info.classes_can_miss }}</dd>
+                                {% endif %}
+                            </dl>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="alert alert-info" role="alert">
+                    No exam dates set for this academic session yet. Please <a href="{% url 'add_exam_date' session_pk=subject.session.pk %}" class="alert-link">add exam dates</a> to see eligibility projections.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">Attendance History</h5>
+        </div>
+        <div class="card-body">
+            {% if attendance_records %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th scope="col">Date</th>
+                                <th scope="col" class="text-end">Attended / Conducted</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for record in attendance_records %}
+                            <tr>
+                                <td>{{ record.date|date:"F d, Y" }}</td>
+                                <td class="text-end">{{ record.classes_attended }} / {{ record.classes_conducted }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info" role="alert">
+                    No attendance records yet for this subject. <a href="{% url 'add_attendance' subject_pk=subject.pk %}" class="alert-link">Add one now</a>!
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="text-center mt-4 mb-5">
+        <a href="{% url 'dashboard' %}" class="btn btn-secondary btn-lg">Back to Dashboard</a>
+    </div>
+</div>
 {% endblock %}

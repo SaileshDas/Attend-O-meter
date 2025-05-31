@@ -1,0 +1,62 @@
+{% extends 'base.html' %} {# Adjust your base template name if it's different #}
+
+{% block title %}Upload Holidays for {{ session.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">Upload Holidays for {{ session.name }}</h4>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">Session Dates: {{ session.start_date|date:"M d, Y" }} to {{ session.end_date|date:"M d, Y" }}</p>
+
+            <div class="alert alert-info" role="alert">
+                <h5 class="alert-heading">CSV File Format Instructions:</h5>
+                <p>Please upload a CSV file containing your holiday dates. The expected format for each row is:</p>
+                <pre><code>YYYY-MM-DD,Holiday Name (optional)</code></pre>
+                <p>For example:</p>
+                <pre><code>2025-01-01,New Year's Day
+2025-10-24,Diwali Break
+2025-12-25,Christmas Day</code></pre>
+                <p>The system is flexible and will also try to parse other common date formats like `DD-MM-YYYY`, `MM/DD/YYYY`, `DD/MM/YYYY`, and `YYYY/MM/DD`.</p>
+                <p>
+                    <small>
+                        If you only have the date, you can omit the holiday name column (e.g., `2025-04-10`).
+                        Empty rows or rows with only a date will be skipped or processed accordingly.
+                    </small>
+                </p>
+            </div>
+
+            {# Display Django Messages (Success, Error, Warning) #}
+            {% if messages %}
+                <div class="mb-3">
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="mb-3">
+                    {{ form.csv_file.label_tag }}
+                    {{ form.csv_file }}
+                    {% if form.csv_file.help_text %}
+                        <div class="form-text">{{ form.csv_file.help_text }}</div>
+                    {% endif %}
+                    {% for error in form.csv_file.errors %}
+                        <div class="text-danger small">{{ error }}</div>
+                    {% endfor %}
+                </div>
+                
+                <button type="submit" class="btn btn-primary me-2">Upload CSV</button>
+                <a href="{% url 'academic_session_list' %}" class="btn btn-secondary">Back to Sessions</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

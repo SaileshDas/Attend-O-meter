@@ -3,11 +3,47 @@
 {% block title %}Add Exam Date{% endblock %}
 
 {% block content %}
-    <h2>Add Exam Date for {{ session.name }}</h2>
-    <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit">Add Exam Date</button>
-    </form>
-    <p><a href="{% url 'dashboard' %}">Back to Dashboard</a></p>
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Add Exam Date for {{ session.name }}</h4>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+
+                    {# Display non-field errors if any #}
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger" role="alert">
+                            {% for error in form.non_field_errors %}
+                                <p class="mb-0">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    {# Loop through each field in the form #}
+                    {% for field in form %}
+                        <div class="mb-3">
+                            {# No checkboxes in ExamDateForm, so we use the standard input rendering #}
+                            <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                            {{ field }} {# This renders the input with 'form-control' class #}
+                            {% if field.errors %}
+                                {% for error in field.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            {% endif %}
+                            {% if field.help_text %}
+                                <div class="form-text">{{ field.help_text }}</div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+
+                    <button type="submit" class="btn btn-primary mt-3">Add Exam Date</button>
+                    <a href="{% url 'dashboard' %}" class="btn btn-secondary mt-3 ms-2">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

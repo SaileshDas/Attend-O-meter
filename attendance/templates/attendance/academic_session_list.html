@@ -3,22 +3,57 @@
 {% block title %}Academic Sessions{% endblock %}
 
 {% block content %}
-    <h2>Your Academic Sessions</h2>
-    <p><a href="{% url 'add_academic_session' %}">Add New Academic Session</a></p>
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Your Academic Sessions</h2>
+        <a href="{% url 'add_academic_session' %}" class="btn btn-primary">Add New Academic Session</a>
+    </div>
+
     {% if sessions %}
-        <ul>
-            {% for session in sessions %}
-                <li>
-                    <strong>{{ session.name }}</strong> ({{ session.start_date|date:"Y" }} - {{ session.end_date|date:"Y" }})
-                    {% if session.is_current %}
-                        - <span style="font-weight: bold; color: green;">Current</span>
-                    {% endif %}
-                    <a href="{% url 'update_academic_session' pk=session.pk %}">Edit</a>
-                    <a href="{% url 'add_subject' session_pk=session.pk %}">Add Subject</a>
-                </li>
-            {% endfor %}
-        </ul>
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped mb-0"> {# Added table-hover and table-striped for better aesthetics #}
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col">Session Name</th>
+                            <th scope="col">Duration</th>
+                            <th scope="col">Status</th>
+                            <th scope="col" class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for session in sessions %}
+                        <tr>
+                            <td>
+                                <strong>{{ session.name }}</strong>
+                            </td>
+                            <td>
+                                {{ session.start_date|date:"M d, Y" }} - {{ session.end_date|date:"M d, Y" }}
+                            </td>
+                            <td>
+                                {% if session.is_current %}
+                                <span class="badge bg-success">Current</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Archived</span> {# Or similar status #}
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <a href="{% url 'update_academic_session' pk=session.pk %}" class="btn btn-sm btn-info me-2">Edit</a>
+                                <a href="{% url 'add_subject' session_pk=session.pk %}" class="btn btn-sm btn-success">Add Subject</a>
+                                <a href="{% url 'upload_holidays' session_id=session.pk %}" class="btn btn-sm btn-secondary">Upload Holidays</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
     {% else %}
-        <p>You haven't added any academic sessions yet. <a href="{% url 'add_academic_session' %}">Add one now</a>!</p>
+    <div class="alert alert-info" role="alert">
+        You haven't added any academic sessions yet. <a href="{% url 'add_academic_session' %}" class="alert-link">Add one now</a>!
+    </div>
     {% endif %}
+</div>
 {% endblock %}

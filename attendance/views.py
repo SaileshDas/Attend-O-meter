@@ -1,46 +1,36 @@
 # attendance/views.py
-import datetime
+import csv
+from io import TextIOWrapper # Used to correctly read the uploaded file
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.urls import reverse
-from .forms import AcademicSessionForm, SubjectForm, ExamDateForm, AttendanceRecordForm, HolidayBulkForm
+from .forms import AcademicSessionForm, SubjectForm, ExamDateForm, AttendanceRecordForm, HolidayBulkForm, HolidayUploadForm
 from .models import AcademicSession, Subject, AttendanceRecord, ExamDate, Holiday
 from django.db import IntegrityError
 from django.contrib import messages # For displaying messages to the user
-from datetime import timedelta
+from datetime import timedelta, datetime # <-- This import is correct for datetime.strptime()
 
-# --- Helper function to count class days between two dates, considering holidays ---
-def get_working_days_count(start_date, end_date, holidays_set):
+# Helper function: get_working_days_count (Keep this as is, it's still useful for defining periods)
+def get_working_days_count(start_date, end_date, holidays):
+    """
+    Calculates the number of working days (Mon-Fri + 1st/3rd Sat if applicable)
+    between start_date and end_date (inclusive).
+    """
+    if start_date > end_date:
+        return 0
+
     count = 0
-    current = start_date
-    while current <= end_date:
-        # Check for Sunday (weekday() returns 6 for Sunday)
-        if current.weekday() == 6: # Sunday
-            current += timedelta(days=1) # Advance date
-            continue # Skip to next iteration
-
-        # Check for 1st and 3rd Saturday (weekday() returns 5 for Saturday)
-        if current.weekday() == 5: # Saturday
-            first_day_of_month_for_sat_check = current.replace(day=1)
-            saturdays_in_month_so_far = 0
-            temp_saturday_date = first_day_of_month_for_sat_check
-            while temp_saturday_date <= current:
-                if temp_saturday_date.weekday() == 5:
-                    saturdays_in_month_so_far += 1
-                temp_saturday_date += timedelta(days=1)
-            
-            if saturdays_in_month_so_far == 1 or saturdays_in_month_so_far == 3: # 1st or 3rd Saturday
-                current += timedelta(days=1) # Advance date
-                continue # Skip to next iteration
-
-        # Check for declared holidays
-        if current in holidays_set:
-            current += timedelta(days=1) # Advance date
-            continue # Skip to next iteration
-
-        # If we reach here, it's a working day
-        count += 1
-        current += timedelta(days=1) # Always advance date at the end of the loop body for working days
+    current_date = start_date
+    
+    while current_date <= end_date:
+        if 0 <= current_date.weekday() <= 4: # Monday (0) to Friday (4)
+            if current_date not in holidays:
+                count += 1
+        elif current_date.weekday() == 5: # Saturday (5)
+            if (current_date.day - 1) // 7 in [0, 2]: # 1st or 3rd Saturday
+                if current_date not in holidays:
+                    count += 1
+        current_date += timedelta(days=1)
     return count
 
 # --- Dashboard View (Home Page) ---
@@ -84,7 +74,7 @@ def add_academic_session(request):
                 pass # Form will be re-rendered with errors if any
     else:
         form = AcademicSessionForm(initial={'is_current': True}) # Default to current for new sessions
-    return render(request, 'attendance/add_academic_session.html', {'form': form})
+    return render(request, 'attendance/academic_session_form.html', {'form': form})
 
 @login_required
 def update_academic_session(request, pk):
@@ -95,7 +85,7 @@ def update_academic_session(request, pk):
             try:
                 # If this session is being set as current, unmark others
                 if form.cleaned_data['is_current']:
-                   AcademicSession.objects.filter(user=request.user, is_current=True).exclude(pk=session.pk).update(is_current=False)
+                    AcademicSession.objects.filter(user=request.user, is_current=True).exclude(pk=session.pk).update(is_current=False)
                 session.save()
                 messages.success(request, f"Academic Session '{session.name}' updated successfully!")
                 return redirect('dashboard')
@@ -103,7 +93,7 @@ def update_academic_session(request, pk):
                 messages.error(request, "Failed to update session. Check for duplicate session names or current session conflicts.")
     else:
         form = AcademicSessionForm(instance=session)
-    return render(request, 'attendance/update_academic_session.html', {'form': form, 'session': session})
+    return render(request, 'attendance/academic_session_form.html', {'form': form, 'session': session})
 
 @login_required
 def academic_session_list(request):
@@ -128,7 +118,7 @@ def add_subject(request, session_pk):
     else:
         form = SubjectForm()
     context = {'form': form, 'session': session}
-    return render(request, 'attendance/add_subject.html', context)
+    return render(request, 'attendance/subject_form.html', context)
 
 # Placeholder for future:
 @login_required
@@ -142,7 +132,7 @@ def update_subject(request, pk):
             return redirect('dashboard')
     else:
         form = SubjectForm(instance=subject)
-    return render(request, 'attendance/update_subject.html', {'form': form, 'subject': subject})
+    return render(request, 'attendance/subject_form.html', {'form': form, 'subject': subject})
 
 @login_required
 def subject_detail(request, pk):
@@ -161,42 +151,68 @@ def subject_detail(request, pk):
     # Fetch all holidays for the current session once
     session_holidays = set(Holiday.objects.filter(session=session).values_list('date', flat=True))
 
-    for exam in exam_dates:
-        today = datetime.date.today() # Define today here inside the loop for each exam date projection
+    today = datetime.today().date() # Get current datetime, then extract date part
 
+    # Define a minimum threshold for relying on observed historical data
+    # If fewer than this many classes have been conducted, fall back to theoretical model
+    MIN_CLASSES_FOR_HISTORICAL_PROJECTION = 5 # Adjust this number as needed (e.g., 10 or 15)
+
+    for exam in exam_dates:
+        # 0. Handle Exam Past scenario first
         if exam.start_date <= today:
             eligibility_info[exam.exam_type] = {
                 'status': 'Exam Past',
                 'detail': 'This exam date has already passed.',
-                'total_projected_classes': total_conducted,
+                'total_projected_classes': total_conducted, 
                 'projected_attended': total_attended,
                 'projected_percentage': current_percentage,
+                'classes_remaining_to_be_conducted': 0,
+                'min_required_classes': 0,
                 'classes_to_attend_for_eligibility': 0,
                 'classes_can_miss': 0,
             }
             continue
 
-        # 1. Total projected classes until exam start date
-        days_from_session_start_to_exam_end = exam.start_date - timedelta(days=1) # up to day before exam
-        total_working_days_to_exam = get_working_days_count(session.start_date, days_from_session_start_to_exam_end, session_holidays)
-        
-        # Define average working days per week for scaling classes_per_week.
-        # If your college has 1st/3rd Saturdays off, then a month has ~2 working Saturdays.
-        # So average 5 weekdays + 2 working Saturdays / 4 = 5.5 working days per week.
-        AVERAGE_WORKING_DAYS_PER_WEEK = 5.5 # Mon-Fri + average of 2 working Saturdays out of 4.
+        # Define the end date for total projections (day before exam starts)
+        projection_end_date = exam.start_date - timedelta(days=1)
 
-        # Calculate projected classes based on total working days
-        total_projected_classes_until_exam = (total_working_days_to_exam / AVERAGE_WORKING_DAYS_PER_WEEK) * subject.classes_per_week
-        total_projected_classes_until_exam = round(total_projected_classes_until_exam) # Round to nearest whole number
+        # Handle edge case where session start date is after the projection end date
+        if projection_end_date < session.start_date:
+            total_projected_classes_until_exam = 0
+            projection_method_detail = "Exam date before session start."
+        else:
+            # Calculate total working days from session start to exam date
+            total_working_days_to_exam_end_date = get_working_days_count(session.start_date, projection_end_date, session_holidays)
 
-        # Ensure total_projected_classes_until_exam is at least equal to total_conducted
-        # This prevents issues if the model for projection estimates fewer classes than have already occurred.
+            # Calculate working days elapsed from session start to today (inclusive)
+            working_days_elapsed_till_today = get_working_days_count(session.start_date, today, session_holidays)
+
+            # --- NEW PROJECTION LOGIC: Prioritize historical rate ---
+            if total_conducted >= MIN_CLASSES_FOR_HISTORICAL_PROJECTION and working_days_elapsed_till_today > 0:
+                # Calculate actual classes conducted per working day based on history
+                actual_classes_per_working_day = total_conducted / working_days_elapsed_till_today
+                
+                # Project this rate over the total duration until the exam
+                total_projected_classes_until_exam = actual_classes_per_working_day * total_working_days_to_exam_end_date
+                total_projected_classes_until_exam = round(total_projected_classes_until_exam)
+                projection_method_detail = "Based on observed historical class rate."
+            else:
+                # Fallback to the theoretical method if not enough history or no classes yet
+                # This AVERAGE_WORKING_DAYS_PER_WEEK is only used if historical data isn't sufficient
+                AVERAGE_WORKING_DAYS_PER_WEEK = 5.5 
+                total_projected_classes_until_exam = (total_working_days_to_exam_end_date / AVERAGE_WORKING_DAYS_PER_WEEK) * subject.classes_per_week
+                total_projected_classes_until_exam = round(total_projected_classes_until_exam)
+                projection_method_detail = "Based on theoretical schedule (insufficient historical data)."
+
+        # IMPORTANT: Ensure projected total is at least what's already conducted
+        # This prevents scenarios where the projection model might estimate fewer classes than have already happened.
         total_projected_classes_until_exam = max(total_projected_classes_until_exam, total_conducted)
-
-        if total_projected_classes_until_exam <= 0: # Recalculate if still zero/negative after max
-             eligibility_info[exam.exam_type] = {
+        
+        # If no classes are projected (or somehow became 0 after max)
+        if total_projected_classes_until_exam <= 0:
+            eligibility_info[exam.exam_type] = {
                 'status': 'Not Applicable',
-                'detail': 'Cannot project eligibility as no effective class days are expected before this exam date.',
+                'detail': 'Cannot project eligibility as no effective class days are expected before this exam date or subject has no classes.',
                 'total_projected_classes': 0,
                 'classes_remaining_to_be_conducted': 0,
                 'min_required_classes': 0,
@@ -205,54 +221,48 @@ def subject_detail(request, pk):
                 'current_percentage': current_percentage,
                 'projected_percentage_if_all_attended': 0,
             }
-             continue
+            continue
 
-
-        # Classes remaining calculation:
-        # Count working days from TODAY until exam start date
-        # Use `today` for calculating remaining classes.
+        # Calculate Classes Remaining to be Conducted (consistent with total projected)
+        classes_remaining_to_be_conducted = max(0, total_projected_classes_until_exam - total_conducted)
         
-        # Ensure `today` is not after `days_from_session_start_to_exam_end` for `get_working_days_count`
-        if today > days_from_session_start_to_exam_end:
-            classes_remaining_to_be_conducted = 0
-        else:
-            classes_remaining_to_be_conducted_estimate = (get_working_days_count(today, days_from_session_start_to_exam_end, session_holidays) / AVERAGE_WORKING_DAYS_PER_WEEK) * subject.classes_per_week
-            classes_remaining_to_be_conducted = max(0, round(classes_remaining_to_be_conducted_estimate))
-
-
+        # Calculate Minimum Required Classes based on Total Projected
         min_required_classes = (subject.minimum_attendance_percentage / 100) * total_projected_classes_until_exam
         min_required_classes = round(min_required_classes)
 
+        # Projected percentage if ALL remaining classes are attended
         projected_attended_if_all_attended = total_attended + classes_remaining_to_be_conducted
         projected_percentage_if_all_attended = (projected_attended_if_all_attended / total_projected_classes_until_exam * 100) if total_projected_classes_until_exam > 0 else 0
-
 
         status = ''
         detail = ''
         classes_to_attend_for_eligibility = 0
         classes_can_miss = 0
 
+        # Determine Eligibility Status, Detail, and Classes to Attend/Miss
         if projected_percentage_if_all_attended < subject.minimum_attendance_percentage:
             status = 'Ineligible'
             detail = f"You cannot reach {subject.minimum_attendance_percentage:.2f}% attendance for this exam, even if you attend all {classes_remaining_to_be_conducted} remaining classes. Your max possible attendance will be {projected_percentage_if_all_attended:.2f}%."
-            classes_to_attend_for_eligibility = classes_remaining_to_be_conducted # Essentially means they need to attend all
+            classes_to_attend_for_eligibility = classes_remaining_to_be_conducted 
             classes_can_miss = 0
         else:
             classes_needed = max(0, min_required_classes - total_attended)
 
-            if classes_needed > 0:
+            if classes_needed > 0: # Needs Attention: requires more classes to reach minimum
                 status = 'Needs Attention'
-                detail = f"You must attend at least {classes_needed} more classes to reach {subject.minimum_attendance_percentage:.2f}% eligibility. You can miss up to {classes_remaining_to_be_conducted - classes_needed} more classes."
                 classes_to_attend_for_eligibility = classes_needed
-                classes_can_miss = classes_remaining_to_be_conducted - classes_needed
-            else:
-                status = 'Good'
+                classes_can_miss = classes_remaining_to_be_conducted - classes_needed # Classes you can miss = Remaining classes - Classes needed to attend
+                detail = f"You must attend at least {classes_needed} more classes to reach {subject.minimum_attendance_percentage:.2f}% eligibility. You can miss up to {classes_can_miss} more classes."
                 
-                max_missed_overall = total_projected_classes_until_exam - min_required_classes
+            else: # Good: Already met or exceeded minimum required attendance
+                status = 'Good'
+                classes_to_attend_for_eligibility = 0
+
+                max_overall_misses_allowed = total_projected_classes_until_exam - min_required_classes
                 classes_already_missed = total_conducted - total_attended
                 
-                classes_can_miss = max(0, round(max_missed_overall - classes_already_missed))
-                classes_can_miss = min(classes_can_miss, classes_remaining_to_be_conducted)
+                classes_can_miss = max(0, max_overall_misses_allowed - classes_already_missed)
+                classes_can_miss = min(classes_can_miss, classes_remaining_to_be_conducted) # Cap by actual remaining classes
 
                 if classes_can_miss == 0 and classes_remaining_to_be_conducted > 0:
                     status = 'Good (No Misses Left)'
@@ -263,9 +273,10 @@ def subject_detail(request, pk):
                 else:
                     detail = f"You can afford to miss up to {classes_can_miss} more classes and still be eligible for this exam (reaching at least {subject.minimum_attendance_percentage:.2f}%)."
         
+        # Store all calculated info for the current exam, including projection method detail
         eligibility_info[exam.exam_type] = {
             'status': status,
-            'detail': detail,
+            'detail': detail + (f" (Projection: {projection_method_detail})" if projection_method_detail else ""),
             'total_projected_classes': total_projected_classes_until_exam,
             'classes_remaining_to_be_conducted': classes_remaining_to_be_conducted,
             'min_required_classes': min_required_classes,
@@ -285,6 +296,89 @@ def subject_detail(request, pk):
     }
     return render(request, 'attendance/subject_detail.html', context)
 
+@login_required
+def upload_holidays(request, session_id):
+    # Ensure you are using AcademicSession here if that's your model name
+    session = get_object_or_404(AcademicSession, pk=session_id, user=request.user)
+    
+    if request.method == 'POST':
+        form = HolidayUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            # Use TextIOWrapper to read the uploaded file as text
+            csv_file = TextIOWrapper(form.cleaned_data['csv_file'].file, encoding='utf-8')
+            reader = csv.reader(csv_file)
+            header_skipped = False
+            holidays_added_count = 0
+            errors = []
+
+            for row_num, row in enumerate(reader):
+                # Skip header row (first row) if present
+                if row_num == 0 and not row[0].strip().replace('-', '').replace('/', '').isdigit(): # Simple heuristic: if first cell isn't numeric-looking, assume header
+                    header_skipped = True
+                    continue
+
+                if not row or not row[0].strip(): # Skip empty rows or rows with empty first column
+                    continue
+
+                try:
+                    date_str = row[0].strip()
+                    holiday_name = row[1].strip() if len(row) > 1 else '' # Optional name
+
+                    # Attempt to parse various date formats
+                    holiday_date = None
+                    # Ordered from most specific/least ambiguous to more common
+                    for fmt in ('%Y-%m-%d', '%d-%m-%Y', '%m/%d/%Y', '%d/%m/%Y', '%Y/%m/%d'): 
+                        try:
+                            holiday_date = datetime.strptime(date_str, fmt).date()
+                            break # Found a format, break the loop
+                        except ValueError:
+                            continue # Try next format
+                    
+                    if holiday_date is None:
+                        errors.append(f"Row {row_num + 1}: Invalid date format '{date_str}'. Please use YYYY-MM-DD, DD-MM-YYYY, MM/DD/YYYY, DD/MM/YYYY, or YYYY/MM/DD.")
+                        continue # Skip to next row
+
+                    # Ensure holiday date is within session bounds (optional, but good practice)
+                    if not (session.start_date <= holiday_date <= session.end_date):
+                        errors.append(f"Row {row_num + 1}: Holiday date {holiday_date} is outside the session dates ({session.start_date} to {session.end_date}).")
+                        continue # Skip to next row
+
+                    # Create or get the holiday - IntegrityError handles unique_together
+                    Holiday.objects.create(
+                        session=session,
+                        date=holiday_date,
+                        name=holiday_name
+                    )
+                    holidays_added_count += 1
+
+                except IntegrityError: # Catches unique_together constraint violation (duplicate date for session)
+                    messages.warning(request, f"Holiday on {date_str} already exists for this session. Skipping row {row_num + 1}.")
+                except IndexError: # Catches rows with not enough columns (e.g., just an empty row or a row with only a date and no name)
+                    errors.append(f"Row {row_num + 1}: Malformed row. Expected at least a date column. Skipping.")
+                except Exception as e:
+                    # Catch any other unexpected errors during row processing
+                    errors.append(f"Row {row_num + 1}: An unexpected error occurred: {e}")
+
+            if holidays_added_count > 0:
+                messages.success(request, f"Successfully added {holidays_added_count} holidays to session '{session.name}'.")
+            if errors:
+                for error in errors:
+                    messages.error(request, error)
+            
+            return redirect('academic_session_list') # Redirect back to the list of sessions
+        else:
+            # If form is not valid (e.g., no file selected)
+            messages.error(request, "Please correct the errors in the form.")
+    else:
+        # For GET requests, show an empty form
+        form = HolidayUploadForm()
+    
+    context = {
+        'form': form,
+        'session': session,
+    }
+    return render(request, 'attendance/upload_holidays.html', context)
+
 # --- Attendance Record Views ---
 @login_required
 def add_attendance(request, subject_pk):
@@ -302,7 +396,7 @@ def add_attendance(request, subject_pk):
                 messages.error(request, f"An attendance record for {subject.name} on {record.date} already exists.")
     else:
         # Set the initial date to today's date when the form is first displayed (GET request)
-        form = AttendanceRecordForm(initial={'date': datetime.date.today()}) # <-- Change this line!
+        form = AttendanceRecordForm(initial={'date': datetime.date.today()})
     context = {'form': form, 'subject': subject}
     return render(request, 'attendance/add_attendance.html', context)
 
@@ -351,7 +445,8 @@ def bulk_add_holidays(request):
                         date_str = parts[0].strip()
                         holiday_name = parts[1].strip() if len(parts) > 1 else "Holiday" # Default name if not provided
                         
-                        holiday_date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+                        # CORRECTED LINE HERE:
+                        holiday_date = datetime.strptime(date_str, '%Y-%m-%d').date()
                         
                         Holiday.objects.create(session=session, name=holiday_name, date=holiday_date)
                         holidays_added_count += 1
