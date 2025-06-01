@@ -1,0 +1,9 @@
+/* style.css */
+.navbar .nav-item .nav-link.active {
+    color: #ffc107 !important; /* Example: Bright yellow/gold for active link */
+    /* You can also add a subtle background */
+    /* background-color: rgba(255, 193, 7, 0.1); */
+    border-radius: 5px; /* Slightly rounded corners */
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+}

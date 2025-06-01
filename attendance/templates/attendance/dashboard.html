@@ -1,100 +1,108 @@
-{# attendance/templates/attendance/dashboard.html #}
+{% extends "base.html" %}
 
-{% extends 'base.html' %}
-
-{% block title %}Dashboard - Attendance Tracker{% endblock %}
+{% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">Welcome to your Dashboard, {{ user.username }}!</h2>
+<div class="container mt-4">
+    <h2 class="mb-4 text-center">Your Dashboard</h2>
 
-{% if current_session %}
-    <div class="card mb-4 shadow-sm">
-        <div class="card-body">
-            <h3 class="card-title">Current Academic Session: {{ current_session.name }}</h3>
-            <p class="card-text">
-                <a href="{% url 'update_academic_session' pk=current_session.pk %}" class="btn btn-sm btn-outline-secondary">Edit Session</a>
-                <a href="{% url 'academic_session_list' %}" class="btn btn-sm btn-outline-info ms-2">All Sessions</a>
-            </p>
+    {% if not current_session %}
+        <div class="alert alert-warning text-center" role="alert">
+            <h4 class="alert-heading">No Current Academic Session Set!</h4>
+            <p>It looks like you haven't set up a current academic session yet. This is essential to track subjects, attendance, and exams.</p>
+            <hr>
+            <p class="mb-0">Please <a href="{% url 'add_academic_session' %}" class="alert-link">add a new session</a> or <a href="{% url 'academic_session_list' %}" class="alert-link">select an existing one</a> and mark it as current to get started.</p>
         </div>
-    </div>
+    {% else %}
+        <h3 class="mb-4 text-center text-muted">Academic Session: {{ current_session.name }} ({{ current_session.start_date|date:"F Y" }} - {{ current_session.end_date|date:"F Y" }})</h3>
 
-    <div class="row">
-        {# Subjects Card #}
-        <div class="col-md-6 mb-4">
-            <div class="card h-100 shadow-sm">
-                <div class="card-header bg-light">
-                    <h4 class="mb-0">Your Subjects</h4>
+        {# Summary Cards #}
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card text-white bg-primary mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Subjects</h5>
+                        <p class="card-text fs-2">{{ subjects|length }}</p>
+                        <a href="{% url 'add_subject' session_pk=current_session.pk %}" class="card-link text-white text-decoration-none">Add New Subject <i class="bi bi-arrow-right"></i></a>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <a href="{% url 'add_subject' session_pk=current_session.pk %}" class="btn btn-primary btn-sm mb-3">Add New Subject</a>
-                    {% if subjects %}
-                        <ul class="list-group list-group-flush">
-                            {% for subject in subjects %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <a href="{% url 'subject_detail' pk=subject.pk %}" class="fw-bold text-decoration-none">{{ subject.name }} ({{ subject.code|default:"N/A" }})</a>
-                                        <br>
-                                        <small class="text-muted">Min. Attendance: {{ subject.minimum_attendance_percentage|floatformat:"0" }}%</small>
-                                    </div>
-                                    <div>
-                                        <a href="{% url 'add_attendance' subject_pk=subject.pk %}" class="btn btn-success btn-sm me-2">Add Attendance</a>
-                                        <a href="{% url 'update_subject' pk=subject.pk %}" class="btn btn-outline-primary btn-sm">Edit</a>
-                                    </div>
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p class="text-muted">No subjects added yet for this session. <a href="{% url 'add_subject' session_pk=current_session.pk %}">Add your first subject</a>.</p>
-                    {% endif %}
+            </div>
+            <div class="col-md-4">
+                <div class="card text-white bg-success mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Upcoming Exams</h5>
+                        <p class="card-text fs-2">{{ exam_dates|length }}</p>
+                        <a href="{% url 'add_exam_date' session_pk=current_session.pk %}" class="card-link text-white text-decoration-none">Add Exam Date <i class="bi bi-arrow-right"></i></a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-white bg-info mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Holidays in Session</h5>
+                        <p class="card-text fs-2">{{ current_session.holidays.count }}</p>
+                        <a href="{% url 'bulk_add_holidays' %}" class="card-link text-white text-decoration-none">Manage Holidays <i class="bi bi-arrow-right"></i></a>
+                    </div>
                 </div>
             </div>
         </div>
 
-        {# Upcoming Exams Card #}
-        <div class="col-md-6 mb-4">
-            <div class="card h-100 shadow-sm">
-                <div class="card-header bg-light">
-                    <h4 class="mb-0">Upcoming Exams</h4>
-                </div>
-                <div class="card-body">
-                    <a href="{% url 'add_exam_date' session_pk=current_session.pk %}" class="btn btn-primary btn-sm mb-3">Add New Exam Date</a>
-                    {% if exam_dates %}
-                        <ul class="list-group list-group-flush">
-                            {% for exam in exam_dates %}
-                                <li class="list-group-item">
-                                    <span class="fw-bold">{{ exam.exam_type }}:</span> {{ exam.start_date|date:"F d, Y" }}
-                                    {% if exam.end_date %}- {{ exam.end_date|date:"F d, Y" }}{% endif %}
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p class="text-muted">No exam dates added yet for this session. <a href="{% url 'add_exam_date' session_pk=current_session.pk %}">Add an exam date</a>.</p>
-                    {% endif %}
-                </div>
+        <hr class="border-secondary my-4">
+
+        {# Subjects List #}
+        <h3 class="mb-3 text-secondary">Your Subjects</h3>
+        {% if subjects %}
+            <div class="row">
+                {% for subject in subjects %}
+                    <div class="col-md-6 col-lg-4 mb-4">
+                        <div class="card h-100 bg-secondary text-white border-primary">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ subject.name }} <small class="text-muted">({{ subject.code }})</small></h5>
+                                <p class="card-text">Min. Attendance: **{{ subject.minimum_attendance_percentage }}%**</p>
+                                <p class="card-text">Classes/Week: **{{ subject.classes_per_week }}**</p>
+                                <a href="{% url 'subject_detail' pk=subject.pk %}" class="btn btn-outline-light btn-sm mt-2">View Details <i class="bi bi-arrow-right"></i></a>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
             </div>
-        </div>
-
-        {# Holidays Management Card #}
-        <div class="col-md-6 mb-4">
-            <div class="card h-100 shadow-sm">
-                <div class="card-header bg-light">
-                    <h4 class="mb-0">Holidays Management</h4>
-                </div>
-                <div class="card-body">
-                    <p class="card-text text-muted">Add or manage holidays for academic sessions.</p>
-                    <a href="{% url 'bulk_add_holidays' %}" class="btn btn-info btn-sm me-2">Add Multiple Holidays</a>
-                    <a href="{% url 'admin:attendance_holiday_changelist' %}" class="btn btn-outline-secondary btn-sm">View/Edit in Admin</a>
-                </div>
+        {% else %}
+            <div class="alert alert-info text-center" role="alert">
+                No subjects added for this session yet. <a href="{% url 'add_subject' session_pk=current_session.pk %}" class="alert-link">Add your first subject!</a>
             </div>
-        </div>
+        {% endif %}
 
-        {# Add any other cards/sections here #}
+        <hr class="border-secondary my-4">
 
-    </div> {# End of row #}
+        {# Upcoming Exam Dates #}
+        <h3 class="mb-3 text-secondary">Upcoming Exam Dates</h3>
+        {% if exam_dates %}
+            <div class="table-responsive">
+                <table class="table table-dark table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Exam Type</th>
+                            <th>Start Date</th>
+                            <th>End Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for exam in exam_dates %}
+                            <tr>
+                                <td>{{ exam.exam_type }}</td>
+                                <td>{{ exam.start_date|date:"F j, Y" }}</td>
+                                <td>{{ exam.end_date|date:"F j, Y" }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-info text-center" role="alert">
+                No exam dates set for this session yet. <a href="{% url 'add_exam_date' session_pk=current_session.pk %}" class="alert-link">Add exam dates!</a>
+            </div>
+        {% endif %}
 
-{% else %}
-    <div class="alert alert-warning" role="alert">
-        No current academic session found. Please <a href="{% url 'add_academic_session' %}" class="alert-link">add a new academic session</a> to get started.
-    </div>
-{% endif %}
+    {% endif %} {# End of current_session check #}
+</div>
 {% endblock %}
