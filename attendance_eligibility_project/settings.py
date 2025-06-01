@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'attendance',
+    'widget_tweaks',
 ]
 
 MIDDLEWARE = [
@@ -121,3 +122,7 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Auth related settings
+LOGIN_REDIRECT_URL = 'dashboard' # Redirect here after successful login
+LOGOUT_REDIRECT_URL = 'login'    # Redirect here after logout (or a custom logout page)

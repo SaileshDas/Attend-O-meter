@@ -3,8 +3,9 @@ import csv
 from io import TextIOWrapper # Used to correctly read the uploaded file
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import login # <-- Add this import if you want to auto-login users after signup
 from django.urls import reverse
-from .forms import AcademicSessionForm, SubjectForm, ExamDateForm, AttendanceRecordForm, HolidayBulkForm, HolidayUploadForm
+from .forms import AcademicSessionForm, SubjectForm, ExamDateForm, AttendanceRecordForm, HolidayBulkForm, HolidayUploadForm, SignUpForm
 from .models import AcademicSession, Subject, AttendanceRecord, ExamDate, Holiday
 from django.db import IntegrityError
 from django.contrib import messages # For displaying messages to the user
@@ -473,3 +474,18 @@ def bulk_add_holidays(request):
     
     context = {'form': form}
     return render(request, 'attendance/bulk_add_holidays.html', context)
+
+# --- User Authentication Views ---
+def signup(request):
+    if request.method == 'POST':
+        form = SignUpForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            # OPTIONAL: Log the user in immediately after signup
+            # Uncomment the next line and make sure 'login' is imported from django.contrib.auth
+            # login(request, user)
+            messages.success(request, 'Account created successfully! Please log in.')
+            return redirect('login') # Redirect to the login page
+    else:
+        form = SignUpForm()
+    return render(request, 'registration/signup.html', {'form': form})

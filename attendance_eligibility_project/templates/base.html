@@ -40,7 +40,12 @@
                                 Welcome, {{ user.username }}
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
-                                <li><a class="dropdown-item" href="{% url 'logout' %}">Logout</a></li>
+                                <li>
+                                    <form action="{% url 'logout' %}" method="post" style="display: inline;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="dropdown-item" style="border: none; background: none; cursor: pointer;">Logout</button>
+                                    </form>
+                                </li>
                             </ul>
                         </li>
                     {% else %}
@@ -48,7 +53,7 @@
                             <a class="nav-link" href="{% url 'login' %}">Login</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'register' %}">Register</a>
+                           <a class="nav-link" href="{% url 'signup' %}">Sign Up</a> {# <-- CHANGE THIS LINE #}
                         </li>
                     {% endif %}
                 </ul>
